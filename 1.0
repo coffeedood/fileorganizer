@@ -1,0 +1,62 @@
+import os
+import shutil
+import uuid
+from tkinter import Tk, filedialog
+
+def select_folder(prompt):
+    """Open a dialog to select a folder."""
+    root = Tk()
+    root.withdraw()  # Hide the root window
+    folder = filedialog.askdirectory(title=prompt)
+    return folder
+
+def sanitize_filename(filename):
+    """Remove invalid characters from a filename for folder creation."""
+    invalid_chars = r'\/:*?"<>|'
+    return ''.join(c if c not in invalid_chars else '_' for c in filename)
+
+def organize_mkv_files(source_folder, target_folder):
+    """Organize MKV files into individual folders with file names in folder names."""
+    if not os.path.exists(source_folder):
+        print(f"Source folder '{source_folder}' does not exist.")
+        return
+
+    if not os.path.exists(target_folder):
+        os.makedirs(target_folder)
+
+    # Walk through the source folder and find all MKV files
+    for root, _, files in os.walk(source_folder):
+        for file in files:
+            if file.lower().endswith(".mkv"):
+                source_path = os.path.join(root, file)
+
+                # Create a folder name with the sanitized file name and a unique identifier
+                file_name_without_ext = os.path.splitext(file)[0]
+                sanitized_name = sanitize_filename(file_name_without_ext)
+                unique_folder_name = f"{sanitized_name}_{uuid.uuid4().hex[:8]}"
+                unique_folder_path = os.path.join(target_folder, unique_folder_name)
+                os.makedirs(unique_folder_path, exist_ok=True)
+
+                # Move the MKV file into the new folder
+                target_path = os.path.join(unique_folder_path, file)
+                shutil.move(source_path, target_path)
+                print(f"Moved '{file}' to '{unique_folder_path}'")
+
+    print("Organization complete.")
+
+if __name__ == "__main__":
+    # Prompt the user to select source and target folders
+    print("Select the source folder containing MKV files.")
+    source = select_folder("Select Source Folder")
+    if not source:
+        print("No source folder selected. Exiting.")
+        exit()
+
+    print("Select the target folder where organized folders will be created.")
+    target = select_folder("Select Target Folder")
+    if not target:
+        print("No target folder selected. Exiting.")
+        exit()
+
+    # Organize MKV files
+    organize_mkv_files(source, target)
