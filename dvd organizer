@@ -1,0 +1,123 @@
+import os
+import sqlite3
+from tkinter import Tk, filedialog, Button, messagebox
+
+
+# Database setup
+def setup_database():
+    conn = sqlite3.connect("media_files.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS folders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            folder_title TEXT NOT NULL,
+            folder_size INTEGER NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+# Function to calculate the size of a folder
+def calculate_folder_size(folder_path):
+    total_size = 0
+    for root, _, files in os.walk(folder_path):
+        for file in files:
+            file_path = os.path.join(root, file)
+            if os.path.isfile(file_path):
+                total_size += os.path.getsize(file_path)
+    return total_size
+
+
+# Function to scan for folders and add them to the database
+def scan_for_folders():
+    folder = filedialog.askdirectory(title="Select Folder to Scan")
+    if not folder:
+        return
+
+    conn = sqlite3.connect("media_files.db")
+    cursor = conn.cursor()
+
+    for root, dirs, _ in os.walk(folder):
+        folder_size = calculate_folder_size(root)
+        folder_title = os.path.basename(root).strip().lower()  # Normalize folder title
+        cursor.execute(
+            "INSERT INTO folders (folder_title, folder_size) VALUES (?, ?)",
+            (folder_title, folder_size)
+        )
+        print(f"Added: {folder_title} with size {folder_size} bytes")
+
+    conn.commit()
+    conn.close()
+    messagebox.showinfo("Scan Complete", "Scanning and database update complete.")
+
+
+# Function to delete matching folders by title and size
+def delete_matching_folders():
+    folder = filedialog.askdirectory(title="Select Folder to Delete Files")
+    if not folder:
+        return
+
+    conn = sqlite3.connect("media_files.db")
+    cursor = conn.cursor()
+    deleted_folders = []
+
+    for root, dirs, _ in os.walk(folder):
+        folder_size = calculate_folder_size(root)
+        folder_title = os.path.basename(root).strip().lower()  # Normalize folder title
+
+        # Debugging prints to confirm folder details
+        print(f"Checking folder: {folder_title} with size {folder_size} bytes")
+
+        # Skip deletion if folder title is "video_ts"
+        if folder_title == "video_ts":
+            print(f"Skipping deletion for folder: {folder_title}")
+            continue
+
+        # Check for a match in the database
+        cursor.execute(
+            "SELECT folder_title, folder_size FROM folders WHERE folder_title = ? AND folder_size = ?",
+            (folder_title, folder_size)
+        )
+        match = cursor.fetchone()
+        if match:
+            print(f"Match found: {match}")
+            try:
+                # Delete the folder
+                for root_dir, dirs_in_folder, files_in_folder in os.walk(root, topdown=False):
+                    for file in files_in_folder:
+                        file_path = os.path.join(root_dir, file)
+                        os.remove(file_path)
+                    for dir in dirs_in_folder:
+                        dir_path = os.path.join(root_dir, dir)
+                        os.rmdir(dir_path)
+                os.rmdir(root)
+                deleted_folders.append(root)
+                print(f"Deleted: {root}")
+            except Exception as e:
+                print(f"Error deleting {root}: {e}")
+
+    conn.close()
+
+    if deleted_folders:
+        messagebox.showinfo("Deletion Complete", f"Deleted {len(deleted_folders)} matching folders.")
+    else:
+        messagebox.showinfo("Deletion Complete", "No matching folders found.")
+
+
+# Tkinter GUI setup
+def main():
+    setup_database()
+
+    root = Tk()
+    root.title("Folder Manager")
+    root.geometry("300x200")
+
+    Button(root, text="Scan for Folders", command=scan_for_folders).pack(pady=10)
+    Button(root, text="Select Folder to Delete Files", command=delete_matching_folders).pack(pady=10)
+
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
