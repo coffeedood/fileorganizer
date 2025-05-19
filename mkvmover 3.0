@@ -1,0 +1,80 @@
+import os
+import shutil
+import uuid
+import tkinter as tk
+from tkinter import filedialog, messagebox
+
+def select_source_folder(index):
+    folder = filedialog.askdirectory(title=f"Select Source Folder {index + 1}")
+    if folder:
+        source_folders[index].set(folder)
+
+def select_target_folder(index):
+    folder = filedialog.askdirectory(title=f"Select Target Folder {index + 1}")
+    if folder:
+        target_folders[index].set(folder)
+
+def move_mkv_files():
+    for i in range(2):
+        source = source_folders[i].get()
+        target = target_folders[i].get()
+
+        if not source or not target:
+            messagebox.showerror("Error", f"Please select both source and target folders for pair {i+1}.")
+            return
+
+        mkv_files = []
+        for root, _, files in os.walk(source):
+            for file in files:
+                if file.lower().endswith(".mkv"):
+                    mkv_files.append(os.path.join(root, file))
+
+        if not mkv_files:
+            messagebox.showinfo("No MKV Files", f"No .mkv files found in Source Folder {i+1}.")
+            continue
+
+        moved_count = 0
+        for file_path in mkv_files:
+            try:
+                file_name = os.path.basename(file_path)
+                file_base, _ = os.path.splitext(file_name)
+
+                # Sanitize base name for folder use
+                safe_base = "".join(c for c in file_base if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                unique_folder_name = f"{safe_base}_{uuid.uuid4().hex[:6]}"
+                unique_folder_path = os.path.join(target, unique_folder_name)
+
+                os.makedirs(unique_folder_path, exist_ok=True)
+
+                target_file_path = os.path.join(unique_folder_path, file_name)
+                shutil.move(file_path, target_file_path)
+                moved_count += 1
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not move {file_path} to Target Folder {i+1}: {e}")
+
+        messagebox.showinfo("Success", f"Moved {moved_count} .mkv files from Source Folder {i+1} to Target Folder {i+1}.")
+
+# GUI setup
+root = tk.Tk()
+root.title("Dual MKV File Mover")
+
+source_folders = [tk.StringVar(), tk.StringVar()]
+target_folders = [tk.StringVar(), tk.StringVar()]
+
+# Source folder selection
+for i in range(2):
+    tk.Label(root, text=f"Source Folder {i+1}:").pack(pady=5)
+    tk.Entry(root, textvariable=source_folders[i], width=50).pack(pady=5)
+    tk.Button(root, text=f"Select Source Folder {i+1}", command=lambda idx=i: select_source_folder(idx)).pack(pady=5)
+
+# Target folder selection
+for i in range(2):
+    tk.Label(root, text=f"Target Folder {i+1}:").pack(pady=5)
+    tk.Entry(root, textvariable=target_folders[i], width=50).pack(pady=5)
+    tk.Button(root, text=f"Select Target Folder {i+1}", command=lambda idx=i: select_target_folder(idx)).pack(pady=5)
+
+# Move button
+tk.Button(root, text="Move MKV Files", command=move_mkv_files).pack(pady=20)
+
+root.mainloop()
