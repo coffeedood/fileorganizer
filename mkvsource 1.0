@@ -1,0 +1,101 @@
+import os
+import shutil
+import uuid
+from collections import defaultdict
+import tkinter as tk
+from tkinter import filedialog, messagebox
+
+def get_file_size_dict(folder, file_extension):
+    """Scans a folder and returns a dictionary of (filename, filesize) -> full path."""
+    file_dict = defaultdict(list)
+    for dirpath, dirnames, filenames in os.walk(folder):
+        for filename in filenames:
+            if filename.lower().endswith(file_extension):
+                full_path = os.path.join(dirpath, filename)
+                try:
+                    file_size = os.path.getsize(full_path)
+                    file_dict[(filename, file_size)].append(full_path)
+                except FileNotFoundError:
+                    print(f"File not found: {full_path}")
+    return file_dict
+
+def move_duplicates(source_dir, target_dir, move_dir, file_extension=".mkv"):
+    """Moves duplicate files into uniquely named folders under the move_dir."""
+    moved_files = []
+    source_files = get_file_size_dict(source_dir, file_extension)
+    target_files = get_file_size_dict(target_dir, file_extension)
+
+    for (filename, size), paths in source_files.items():
+        if (filename, size) in target_files:
+            for source_path in paths:
+                base_name = os.path.splitext(filename)[0]
+                unique_id = uuid.uuid4().hex[:8]  # 8-character random ID
+                unique_folder_name = f"{base_name}_{unique_id}"
+
+                dest_folder_path = os.path.join(move_dir, unique_folder_name)
+                os.makedirs(dest_folder_path, exist_ok=True)
+
+                dest_path = os.path.join(dest_folder_path, filename)
+                print(f"Moving '{source_path}' to '{dest_path}'")
+                shutil.move(source_path, dest_path)
+                moved_files.append(dest_path)
+    return moved_files
+
+# GUI Functions
+def select_source_folder():
+    folder = filedialog.askdirectory()
+    if folder:
+        source_entry.delete(0, tk.END)
+        source_entry.insert(0, folder)
+
+def select_target_folder():
+    folder = filedialog.askdirectory()
+    if folder:
+        target_entry.delete(0, tk.END)
+        target_entry.insert(0, folder)
+
+def select_move_folder():
+    folder = filedialog.askdirectory()
+    if folder:
+        move_entry.delete(0, tk.END)
+        move_entry.insert(0, folder)
+
+def start_processing():
+    source_dir = source_entry.get()
+    target_dir = target_entry.get()
+    move_dir = move_entry.get()
+
+    if not all([source_dir, target_dir, move_dir]):
+        messagebox.showwarning("Missing Folders", "Please select all three folders.")
+        return
+
+    moved = move_duplicates(source_dir, target_dir, move_dir, file_extension=".mkv")
+
+    if moved:
+        messagebox.showinfo("Files Moved", f"Moved {len(moved)} duplicate file(s) to uniquely named folders.")
+    else:
+        messagebox.showinfo("No Duplicates", "No duplicates were found.")
+
+# GUI Setup
+root = tk.Tk()
+root.title("MKV Duplicate Mover with Unique Folder Names")
+
+# Labels and Buttons
+tk.Label(root, text="Source Folder:").grid(row=0, column=0, padx=10, pady=5, sticky=tk.E)
+source_entry = tk.Entry(root, width=50)
+source_entry.grid(row=0, column=1, padx=10, pady=5)
+tk.Button(root, text="Browse", command=select_source_folder).grid(row=0, column=2, padx=10, pady=5)
+
+tk.Label(root, text="Target Folder:").grid(row=1, column=0, padx=10, pady=5, sticky=tk.E)
+target_entry = tk.Entry(root, width=50)
+target_entry.grid(row=1, column=1, padx=10, pady=5)
+tk.Button(root, text="Browse", command=select_target_folder).grid(row=1, column=2, padx=10, pady=5)
+
+tk.Label(root, text="Move-to Folder:").grid(row=2, column=0, padx=10, pady=5, sticky=tk.E)
+move_entry = tk.Entry(root, width=50)
+move_entry.grid(row=2, column=1, padx=10, pady=5)
+tk.Button(root, text="Browse", command=select_move_folder).grid(row=2, column=2, padx=10, pady=5)
+
+tk.Button(root, text="Start Processing", command=start_processing).grid(row=3, column=1, pady=20)
+
+root.mainloop()
