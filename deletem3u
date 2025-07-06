@@ -1,0 +1,30 @@
+import os
+import tkinter as tk
+from tkinter import filedialog, messagebox
+
+def select_source_folder():
+    folder_selected = filedialog.askdirectory(title="Select Source Folder")
+    if folder_selected:
+        delete_m3u_files(folder_selected)
+
+def delete_m3u_files(folder):
+    deleted_files = []
+    for root, _, files in os.walk(folder):
+        for file in files:
+            if file.endswith(".m3u"):
+                file_path = os.path.join(root, file)
+                try:
+                    os.remove(file_path)
+                    deleted_files.append(file_path)
+                except Exception as e:
+                    print(f"Error deleting {file_path}: {e}")
+    
+    messagebox.showinfo("Process Completed", f"Deleted {len(deleted_files)} .m3u files.")
+
+def main():
+    root = tk.Tk()
+    root.withdraw()  # Hide main window
+    select_source_folder()
+
+if __name__ == "__main__":
+    main()
